@@ -44,9 +44,6 @@ const Navbar = () => {
           <Link to="/auth">
             <Button variant="ghost">Login</Button>
           </Link>
-          <Link to="/auth">
-            <Button>Get Started</Button>
-          </Link>
         </div>
 
         {/* Mobile Navigation */}
@@ -73,9 +70,6 @@ const Navbar = () => {
                   <Button variant="outline" className="w-full">
                     Login
                   </Button>
-                </Link>
-                <Link to="/auth" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full">Get Started</Button>
                 </Link>
               </div>
             </div>

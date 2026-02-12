@@ -91,11 +91,6 @@ const Index = () => {
                   Get Started <ChevronRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Link to="/dashboard">
-                <Button size="lg" variant="outline" className="text-lg px-8">
-                  View Demo
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
