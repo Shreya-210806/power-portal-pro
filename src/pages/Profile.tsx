@@ -1,22 +1,73 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, Lock, Save } from "lucide-react";
-import { useState } from "react";
+import { User, Mail, Phone, Lock, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Profile = () => {
   const { toast } = useToast();
-  const [profile, setProfile] = useState({
-    name: "John Doe", email: "john@example.com", phone: "+1 555 000 0000", address: "123 Main St, City"
-  });
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState({ full_name: "", email: "", phone: "", address: "" });
+  const [passwords, setPasswords] = useState({ current: "", new_password: "", confirm: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    toast({ title: "Profile Updated", description: "Your details have been saved." });
+  useEffect(() => {
+    if (!authLoading && !user) { navigate("/auth"); return; }
+    if (user) fetchProfile();
+  }, [user, authLoading]);
+
+  const fetchProfile = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle();
+    if (data) setProfile({ full_name: data.full_name || "", email: data.email || "", phone: data.phone || "", address: data.address || "" });
+    setLoading(false);
   };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("profiles").update({
+      full_name: profile.full_name,
+      phone: profile.phone,
+      address: profile.address,
+    }).eq("user_id", user!.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Profile Updated", description: "Your details have been saved." });
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwords.new_password !== passwords.confirm) {
+      toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (passwords.new_password.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: passwords.new_password });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Password Changed" });
+      setPasswords({ current: "", new_password: "", confirm: "" });
+    }
+  };
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
 
   return (
     <DashboardLayout>
@@ -31,11 +82,11 @@ const Profile = () => {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Full Name</Label>
-                <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+                <Input value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
+                <Input value={profile.email} disabled className="opacity-60" />
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
@@ -46,7 +97,10 @@ const Profile = () => {
                 <Input value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} />
               </div>
             </div>
-            <Button onClick={handleSave}><Save className="mr-2 w-4 h-4" />Save Changes</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Save className="mr-2 w-4 h-4" />}
+              Save Changes
+            </Button>
           </CardContent>
         </Card>
 
@@ -55,21 +109,17 @@ const Profile = () => {
             <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" />Change Password</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Current Password</Label>
-              <Input type="password" placeholder="••••••••" />
-            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>New Password</Label>
-                <Input type="password" placeholder="••••••••" />
+                <Input type="password" placeholder="••••••••" value={passwords.new_password} onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Confirm New Password</Label>
-                <Input type="password" placeholder="••••••••" />
+                <Input type="password" placeholder="••••••••" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} />
               </div>
             </div>
-            <Button variant="outline" onClick={() => toast({ title: "Password Changed" })}>Update Password</Button>
+            <Button variant="outline" onClick={handlePasswordChange}>Update Password</Button>
           </CardContent>
         </Card>
       </div>

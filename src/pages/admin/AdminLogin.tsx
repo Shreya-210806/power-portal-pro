@@ -5,17 +5,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Shield, ArrowLeft, Loader2 } from "lucide-react";
-import OtpModal from "@/components/OtpModal";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { setLoading(false); setShowOtp(true); }, 1000);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoading(false);
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    // Check admin role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    
+    setLoading(false);
+    if (!roleData) {
+      await supabase.auth.signOut();
+      toast({ title: "Access Denied", description: "You are not authorized as admin.", variant: "destructive" });
+    } else {
+      toast({ title: "Admin Login Successful" });
+      navigate("/admin/dashboard");
+    }
   };
 
   return (
@@ -34,8 +58,8 @@ const AdminLogin = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2"><Label>Email</Label><Input type="email" placeholder="admin@powergrid.com" required /></div>
-              <div className="space-y-2"><Label>Password</Label><Input type="password" placeholder="••••••••" required /></div>
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@powergrid.com" required /></div>
+              <div className="space-y-2"><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required /></div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</> : "Login"}
               </Button>
@@ -43,7 +67,6 @@ const AdminLogin = () => {
           </CardContent>
         </Card>
       </div>
-      <OtpModal open={showOtp} onOpenChange={setShowOtp} onVerify={() => { setShowOtp(false); navigate("/admin/dashboard"); }} title="Admin Verification" description="Enter OTP sent to your admin email" />
     </div>
   );
 };

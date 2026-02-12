@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,23 +7,78 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { CreditCard, Smartphone, Building2, CheckCircle2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const PayBill = () => {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [method, setMethod] = useState("upi");
   const [paying, setPaying] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [bill, setBill] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [txnId, setTxnId] = useState("");
 
-  const handlePay = () => {
-    setPaying(true);
-    setTimeout(() => {
-      setPaying(false);
-      setSuccess(true);
-      toast({ title: "Payment Successful!", description: "Transaction ID: TXN-" + Date.now().toString().slice(-8) });
-    }, 2000);
+  useEffect(() => {
+    if (!authLoading && !user) { navigate("/auth"); return; }
+    if (user) fetchBill();
+  }, [user, authLoading]);
+
+  const fetchBill = async () => {
+    setLoading(true);
+    const billId = searchParams.get("bill");
+    if (billId) {
+      const { data } = await supabase.from("bills").select("*").eq("id", billId).eq("user_id", user!.id).maybeSingle();
+      setBill(data);
+    } else {
+      // Get first unpaid bill
+      const { data } = await supabase.from("bills").select("*").eq("user_id", user!.id).eq("status", "unpaid").order("due_date", { ascending: true }).limit(1).maybeSingle();
+      setBill(data);
+    }
+    setLoading(false);
   };
 
-  if (success) {
+  const handlePay = async () => {
+    if (!bill) return;
+    setPaying(true);
+    const generatedTxnId = "TXN-" + Date.now().toString().slice(-8);
+    
+    // Insert payment
+    const { error: payError } = await supabase.from("payments").insert({
+      user_id: user!.id,
+      bill_id: bill.id,
+      transaction_id: generatedTxnId,
+      amount: bill.amount,
+      payment_method: method,
+      status: "Success",
+    });
+
+    // Update bill status
+    if (!payError) {
+      await supabase.from("bills").update({ status: "paid" }).eq("id", bill.id);
+      // Create notification
+      await supabase.from("notifications").insert({
+        user_id: user!.id,
+        type: "success",
+        title: "Payment Confirmed",
+        message: `Your payment of $${Number(bill.amount).toFixed(2)} for ${bill.billing_month} has been confirmed. Transaction: ${generatedTxnId}`,
+      });
+    }
+
+    setPaying(false);
+    setTxnId(generatedTxnId);
+    setSuccess(true);
+    toast({ title: "Payment Successful!", description: `Transaction ID: ${generatedTxnId}` });
+  };
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
+
+  if (success && bill) {
     return (
       <DashboardLayout>
         <div className="max-w-md mx-auto text-center py-20">
@@ -31,16 +87,28 @@ const PayBill = () => {
           </div>
           <h1 className="text-3xl font-bold mb-2">Payment Successful!</h1>
           <p className="text-muted-foreground mb-2">Your bill has been paid successfully.</p>
-          <p className="text-sm text-muted-foreground mb-6">Transaction ID: TXN-{Date.now().toString().slice(-8)}</p>
+          <p className="text-sm text-muted-foreground mb-6">Transaction ID: {txnId}</p>
           <div className="space-y-3">
             <Card className="border-border/50">
               <CardContent className="p-4 flex justify-between">
                 <span className="text-muted-foreground">Amount Paid</span>
-                <span className="font-bold text-lg">$132.50</span>
+                <span className="font-bold text-lg">${Number(bill.amount).toFixed(2)}</span>
               </CardContent>
             </Card>
-            <Button onClick={() => setSuccess(false)} variant="outline" className="w-full">Pay Another Bill</Button>
+            <Button onClick={() => navigate("/bills")} variant="outline" className="w-full">View All Bills</Button>
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!bill) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-lg mx-auto text-center py-20">
+          <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">No Pending Bills</h1>
+          <p className="text-muted-foreground">All your bills are paid. Great job!</p>
         </div>
       </DashboardLayout>
     );
@@ -54,10 +122,10 @@ const PayBill = () => {
         <Card className="mb-6 border-border/50 bg-gradient-card">
           <CardHeader><CardTitle>Bill Summary</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between"><span className="text-muted-foreground">Bill Number</span><span className="font-medium">INV-2024-06</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Billing Month</span><span className="font-medium">June 2024</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Units Consumed</span><span className="font-medium">1,100 kWh</span></div>
-            <div className="flex justify-between border-t border-border pt-3"><span className="font-semibold">Total Amount</span><span className="font-bold text-xl text-primary">$132.50</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Bill Number</span><span className="font-medium">{bill.bill_number}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Billing Month</span><span className="font-medium">{bill.billing_month}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Units Consumed</span><span className="font-medium">{Number(bill.units_consumed).toLocaleString()} kWh</span></div>
+            <div className="flex justify-between border-t border-border pt-3"><span className="font-semibold">Total Amount</span><span className="font-bold text-xl text-primary">${Number(bill.amount).toFixed(2)}</span></div>
           </CardContent>
         </Card>
 
@@ -85,7 +153,7 @@ const PayBill = () => {
         </Card>
 
         <Button onClick={handlePay} className="w-full h-12 text-lg" disabled={paying}>
-          {paying ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing...</> : `Pay $132.50`}
+          {paying ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing...</> : `Pay $${Number(bill.amount).toFixed(2)}`}
         </Button>
       </div>
     </DashboardLayout>

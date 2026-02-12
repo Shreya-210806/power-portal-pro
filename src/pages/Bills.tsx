@@ -1,19 +1,41 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, CreditCard, Calendar, DollarSign } from "lucide-react";
+import { Download, CreditCard, Calendar, DollarSign, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Bills = () => {
-  const bills = [
-    { id: "INV-2024-06", date: "June 2024", amount: 132.50, status: "unpaid", dueDate: "Jun 25, 2024", usage: "1100 kWh" },
-    { id: "INV-2024-05", date: "May 2024", amount: 114.00, status: "paid", dueDate: "May 25, 2024", usage: "950 kWh" },
-    { id: "INV-2024-04", date: "April 2024", amount: 107.00, status: "paid", dueDate: "Apr 25, 2024", usage: "890 kWh" },
-    { id: "INV-2024-03", date: "March 2024", amount: 94.00, status: "paid", dueDate: "Mar 25, 2024", usage: "780 kWh" },
-    { id: "INV-2024-02", date: "February 2024", amount: 110.00, status: "paid", dueDate: "Feb 25, 2024", usage: "920 kWh" },
-    { id: "INV-2024-01", date: "January 2024", amount: 102.00, status: "paid", dueDate: "Jan 25, 2024", usage: "850 kWh" },
-  ];
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [bills, setBills] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && !user) { navigate("/auth"); return; }
+    if (user) fetchBills();
+  }, [user, authLoading]);
+
+  const fetchBills = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("bills")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false });
+    setBills(data || []);
+    setLoading(false);
+  };
+
+  const currentBill = bills.find(b => b.status === "unpaid");
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
 
   return (
     <DashboardLayout>
@@ -22,55 +44,61 @@ const Bills = () => {
         <p className="text-muted-foreground">View and manage your electricity bills</p>
       </div>
 
-      <Card className="mb-6 border-border/50 bg-gradient-card shadow-md">
-        <CardHeader><CardTitle>Current Bill</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Amount Due</p>
-              <p className="text-3xl font-bold text-primary">$132.50</p>
+      {currentBill && (
+        <Card className="mb-6 border-border/50 bg-gradient-card shadow-md">
+          <CardHeader><CardTitle>Current Bill</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Amount Due</p>
+                <p className="text-3xl font-bold text-primary">${Number(currentBill.amount).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                <p className="text-lg font-semibold flex items-center gap-2"><Calendar className="w-4 h-4" />{new Date(currentBill.due_date).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Usage</p>
+                <p className="text-lg font-semibold">{Number(currentBill.units_consumed).toLocaleString()} kWh</p>
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full" asChild><Link to={`/pay-bill?bill=${currentBill.id}`}><CreditCard className="mr-2 w-4 h-4" />Pay Now</Link></Button>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Due Date</p>
-              <p className="text-lg font-semibold flex items-center gap-2"><Calendar className="w-4 h-4" />Jun 25, 2024</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Usage</p>
-              <p className="text-lg font-semibold">1,100 kWh</p>
-            </div>
-            <div className="flex items-end">
-              <Button className="w-full" asChild><Link to="/pay-bill"><CreditCard className="mr-2 w-4 h-4" />Pay Now</Link></Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-border/50">
         <CardHeader><CardTitle>Bill History</CardTitle></CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {bills.map((bill) => (
-              <div key={bill.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <DollarSign className="w-5 h-5 text-primary" />
+          {bills.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No bills found yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {bills.map((bill) => (
+                <div key={bill.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <DollarSign className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{bill.billing_month}</p>
+                      <p className="text-sm text-muted-foreground">{bill.bill_number} • {Number(bill.units_consumed).toLocaleString()} kWh</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{bill.date}</p>
-                    <p className="text-sm text-muted-foreground">{bill.id} • {bill.usage}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="font-bold text-lg">${Number(bill.amount).toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Due: {new Date(bill.due_date).toLocaleDateString()}</p>
+                    </div>
+                    <Badge variant={bill.status === "paid" ? "secondary" : "destructive"} className="capitalize">{bill.status}</Badge>
+                    <Button variant="outline" size="icon"><Download className="w-4 h-4" /></Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="font-bold text-lg">${bill.amount}</p>
-                    <p className="text-xs text-muted-foreground">Due: {bill.dueDate}</p>
-                  </div>
-                  <Badge variant={bill.status === "paid" ? "secondary" : "destructive"} className="capitalize">{bill.status}</Badge>
-                  <Button variant="outline" size="icon"><Download className="w-4 h-4" /></Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </DashboardLayout>

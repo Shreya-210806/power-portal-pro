@@ -1,30 +1,47 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Bell } from "lucide-react";
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-
-const bills = [
-  { id: "INV-2024-1001", consumer: "John Doe", month: "June 2024", amount: 132.50, status: "Unpaid" },
-  { id: "INV-2024-1002", consumer: "Jane Smith", month: "June 2024", amount: 98.00, status: "Paid" },
-  { id: "INV-2024-1003", consumer: "Bob Wilson", month: "June 2024", amount: 245.00, status: "Overdue" },
-  { id: "INV-2024-1004", consumer: "Alice Brown", month: "June 2024", amount: 87.00, status: "Paid" },
-  { id: "INV-2024-0901", consumer: "John Doe", month: "May 2024", amount: 114.00, status: "Paid" },
-];
+import { Badge } from "@/components/ui/badge";
+import { Search, Download, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const statusColors: Record<string, string> = {
-  Paid: "bg-success/10 text-success",
-  Unpaid: "bg-warning/10 text-warning",
-  Overdue: "bg-destructive/10 text-destructive",
+  paid: "bg-success/10 text-success",
+  unpaid: "bg-warning/10 text-warning",
+  overdue: "bg-destructive/10 text-destructive",
 };
 
 const AdminBills = () => {
+  const { user, isAdmin, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const { toast } = useToast();
-  const filtered = bills.filter((b) => b.consumer.toLowerCase().includes(search.toLowerCase()) || b.id.includes(search));
+  const [bills, setBills] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && (!user || !isAdmin)) { navigate("/admin/login"); return; }
+    if (user && isAdmin) fetchBills();
+  }, [user, isAdmin, authLoading]);
+
+  const fetchBills = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("bills").select("*").order("created_at", { ascending: false });
+    setBills(data || []);
+    setLoading(false);
+  };
+
+  const filtered = bills.filter(b =>
+    b.bill_number?.toLowerCase().includes(search.toLowerCase()) ||
+    b.billing_month?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
 
   return (
     <DashboardLayout>
@@ -38,39 +55,34 @@ const AdminBills = () => {
 
       <Card className="border-border/50">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border text-left">
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Invoice</th>
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Consumer</th>
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Month</th>
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Amount</th>
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => (
-                  <tr key={b.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-mono text-sm">{b.id}</td>
-                    <td className="p-4 font-medium">{b.consumer}</td>
-                    <td className="p-4 text-sm">{b.month}</td>
-                    <td className="p-4 font-semibold">${b.amount.toFixed(2)}</td>
-                    <td className="p-4"><Badge variant="secondary" className={statusColors[b.status]}>{b.status}</Badge></td>
-                    <td className="p-4 flex gap-1">
-                      <Button variant="ghost" size="icon"><Download className="w-4 h-4" /></Button>
-                      {b.status !== "Paid" && (
-                        <Button variant="ghost" size="icon" onClick={() => toast({ title: "Reminder Sent", description: `Reminder sent to ${b.consumer}` })}>
-                          <Bell className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </td>
+          {bills.length === 0 ? (
+            <p className="text-center text-muted-foreground py-12">No bills found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border text-left">
+                    <th className="p-4 text-sm font-medium text-muted-foreground">Invoice</th>
+                    <th className="p-4 text-sm font-medium text-muted-foreground">User ID</th>
+                    <th className="p-4 text-sm font-medium text-muted-foreground">Month</th>
+                    <th className="p-4 text-sm font-medium text-muted-foreground">Amount</th>
+                    <th className="p-4 text-sm font-medium text-muted-foreground">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((b) => (
+                    <tr key={b.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="p-4 font-mono text-sm">{b.bill_number}</td>
+                      <td className="p-4 font-mono text-xs">{b.user_id?.slice(0, 8)}...</td>
+                      <td className="p-4 text-sm">{b.billing_month}</td>
+                      <td className="p-4 font-semibold">${Number(b.amount).toFixed(2)}</td>
+                      <td className="p-4"><Badge variant="secondary" className={statusColors[b.status] || ""}>{b.status}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </DashboardLayout>

@@ -1,15 +1,18 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bell, AlertTriangle, CheckCircle2, Zap, CreditCard } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Zap, CreditCard, Bell, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
-const notifications = [
-  { id: 1, type: "warning", icon: AlertTriangle, title: "Bill Due Soon", message: "Your June bill of $132.50 is due in 3 days.", time: "2 hours ago", read: false },
-  { id: 2, type: "alert", icon: Zap, title: "High Usage Alert", message: "Your usage today is 40% above average. Check your appliances.", time: "5 hours ago", read: false },
-  { id: 3, type: "success", icon: CheckCircle2, title: "Payment Confirmed", message: "Your payment of $114.00 for May has been confirmed.", time: "2 days ago", read: true },
-  { id: 4, type: "info", icon: CreditCard, title: "Auto-Pay Enabled", message: "Auto-pay has been set up for your account.", time: "1 week ago", read: true },
-  { id: 5, type: "warning", icon: AlertTriangle, title: "Maintenance Notice", message: "Scheduled maintenance on July 5 from 2-4 AM.", time: "1 week ago", read: true },
-];
+const iconMap: Record<string, any> = {
+  warning: AlertTriangle,
+  alert: Zap,
+  success: CheckCircle2,
+  info: CreditCard,
+};
 
 const colorMap: Record<string, string> = {
   warning: "bg-warning/10 text-warning border-warning/20",
@@ -18,38 +21,99 @@ const colorMap: Record<string, string> = {
   info: "bg-primary/10 text-primary border-primary/20",
 };
 
-const Notifications = () => (
-  <DashboardLayout>
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <h1 className="text-3xl font-bold">Notifications</h1>
-        <p className="text-muted-foreground">{notifications.filter((n) => !n.read).length} unread</p>
-      </div>
-    </div>
+const Notifications = () => {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    <div className="space-y-3">
-      {notifications.map((n) => {
-        const Icon = n.icon;
-        return (
-          <Card key={n.id} className={`border-border/50 transition-colors ${!n.read ? "bg-primary/5 border-l-4 border-l-primary" : ""}`}>
-            <CardContent className="p-4 flex items-start gap-4">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colorMap[n.type]}`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-sm">{n.title}</h3>
-                  {!n.read && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">New</Badge>}
-                </div>
-                <p className="text-sm text-muted-foreground">{n.message}</p>
-              </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">{n.time}</span>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  </DashboardLayout>
-);
+  useEffect(() => {
+    if (!authLoading && !user) { navigate("/auth"); return; }
+    if (user) fetchNotifications();
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
+        setNotifications(prev => [payload.new as any, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+    setNotifications(data || []);
+    setLoading(false);
+  };
+
+  const markAsRead = async (id: string) => {
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return (
+    <DashboardLayout>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Notifications</h1>
+          <p className="text-muted-foreground">{unreadCount} unread</p>
+        </div>
+      </div>
+
+      {notifications.length === 0 ? (
+        <Card className="border-border/50"><CardContent className="py-12 text-center text-muted-foreground">No notifications yet.</CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((n) => {
+            const Icon = iconMap[n.type] || Bell;
+            const colors = colorMap[n.type] || colorMap.info;
+            const timeAgo = getTimeAgo(n.created_at);
+            return (
+              <Card
+                key={n.id}
+                className={`border-border/50 transition-colors cursor-pointer ${!n.read ? "bg-primary/5 border-l-4 border-l-primary" : ""}`}
+                onClick={() => !n.read && markAsRead(n.id)}
+              >
+                <CardContent className="p-4 flex items-start gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colors}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-sm">{n.title}</h3>
+                      {!n.read && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">New</Badge>}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{n.message}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo}</span>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </DashboardLayout>
+  );
+};
+
+function getTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default Notifications;
