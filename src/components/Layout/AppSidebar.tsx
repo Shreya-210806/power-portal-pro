@@ -1,15 +1,16 @@
 import {
   Zap, LayoutDashboard, FileText, CreditCard, History, BarChart3,
-  Users, HelpCircle, Bell, User, LogOut, Settings, PlusCircle
+  Users, HelpCircle, Bell, User, LogOut, Settings
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarHeader, SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const userLinks = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -25,16 +26,22 @@ const userLinks = [
 
 const adminLinks = [
   { title: "Admin Dashboard", url: "/admin/dashboard", icon: LayoutDashboard },
-  { title: "Manage Consumers", url: "/admin/consumers", icon: Users },
+  { title: "Manage Users", url: "/admin/consumers", icon: Users },
   { title: "Bills & Payments", url: "/admin/bills", icon: FileText },
   { title: "Reminders", url: "/admin/reminders", icon: Bell },
-  { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const isAdmin = location.pathname.startsWith("/admin");
   const links = isAdmin ? adminLinks : userLinks;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth");
+  };
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -75,11 +82,9 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <Button variant="ghost" className="w-full justify-start text-muted-foreground" asChild>
-          <NavLink to="/auth">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </NavLink>
+        <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
         </Button>
       </SidebarFooter>
     </Sidebar>

@@ -1,35 +1,90 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { 
   Zap, DollarSign, TrendingDown, FileText, AlertCircle, Calendar,
-  Activity, ArrowUpRight, ArrowDownRight
+  Activity, ArrowUpRight, ArrowDownRight, Loader2
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
-  const monthlyUsage = [
-    { month: "Jan", usage: 850 }, { month: "Feb", usage: 920 }, { month: "Mar", usage: 780 },
-    { month: "Apr", usage: 890 }, { month: "May", usage: 950 }, { month: "Jun", usage: 1100 },
-  ];
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<any>(null);
+  const [bills, setBills] = useState<any[]>([]);
+  const [usageData, setUsageData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const dailyUsage = [
-    { day: "Mon", kwh: 32 }, { day: "Tue", kwh: 28 }, { day: "Wed", kwh: 35 },
-    { day: "Thu", kwh: 30 }, { day: "Fri", kwh: 33 }, { day: "Sat", kwh: 38 }, { day: "Sun", kwh: 36 },
-  ];
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+      return;
+    }
+    if (user) fetchData();
+  }, [user, authLoading]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [profileRes, billsRes, usageRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle(),
+      supabase.from("bills").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
+      supabase.from("usage_data").select("*").eq("user_id", user!.id).order("date", { ascending: true }),
+    ]);
+    setProfile(profileRes.data);
+    setBills(billsRes.data || []);
+    setUsageData(usageRes.data || []);
+    setLoading(false);
+  };
+
+  const unpaidBills = bills.filter(b => b.status === "unpaid");
+  const totalDue = unpaidBills.reduce((sum, b) => sum + Number(b.amount), 0);
+  const totalUnits = bills.filter(b => {
+    const now = new Date();
+    return b.billing_month?.includes(now.getFullYear().toString());
+  }).reduce((sum, b) => sum + Number(b.units_consumed), 0);
+
+  // Build chart data from usage_data or fallback
+  const monthlyUsage = usageData.length > 0 
+    ? Object.entries(
+        usageData.reduce((acc: Record<string, number>, d) => {
+          const month = new Date(d.date).toLocaleString("default", { month: "short" });
+          acc[month] = (acc[month] || 0) + Number(d.kwh);
+          return acc;
+        }, {})
+      ).map(([month, usage]) => ({ month, usage }))
+    : [{ month: "No Data", usage: 0 }];
+
+  const recentUsage = usageData.slice(-7).map(d => ({
+    day: new Date(d.date).toLocaleString("default", { weekday: "short" }),
+    kwh: Number(d.kwh),
+  }));
 
   const stats = [
-    { title: "Current Usage", value: "2.4 kWh", change: "+12%", changeType: "increase", icon: Zap, color: "text-primary", bgColor: "bg-primary/10" },
-    { title: "This Month", value: "$132.50", change: "-8%", changeType: "decrease", icon: DollarSign, color: "text-success", bgColor: "bg-success/10" },
-    { title: "Avg. Daily", value: "34.5 kWh", change: "+5%", changeType: "increase", icon: Activity, color: "text-warning", bgColor: "bg-warning/10" },
-    { title: "Unpaid Bills", value: "1", change: "Due in 5 days", changeType: "neutral", icon: FileText, color: "text-destructive", bgColor: "bg-destructive/10" },
+    { title: "Total Units", value: totalUnits > 0 ? `${totalUnits} kWh` : "0 kWh", change: "", changeType: "neutral", icon: Zap, color: "text-primary", bgColor: "bg-primary/10" },
+    { title: "Amount Due", value: `$${totalDue.toFixed(2)}`, change: unpaidBills.length > 0 ? `${unpaidBills.length} unpaid` : "All paid!", changeType: "neutral", icon: DollarSign, color: "text-success", bgColor: "bg-success/10" },
+    { title: "Total Bills", value: `${bills.length}`, change: "", changeType: "neutral", icon: FileText, color: "text-warning", bgColor: "bg-warning/10" },
+    { title: "Unpaid Bills", value: `${unpaidBills.length}`, change: unpaidBills.length > 0 && unpaidBills[0]?.due_date ? `Due: ${new Date(unpaidBills[0].due_date).toLocaleDateString()}` : "", changeType: "neutral", icon: Activity, color: "text-destructive", bgColor: "bg-destructive/10" },
   ];
+
+  if (authLoading || loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-1">Welcome back, John!</h1>
+        <h1 className="text-3xl font-bold mb-1">Welcome back, {profile?.full_name || "User"}!</h1>
         <p className="text-muted-foreground">Here's your energy overview for today</p>
       </div>
 
@@ -43,16 +98,10 @@ const Dashboard = () => {
                   <div className={`w-10 h-10 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
                     <Icon className={`w-5 h-5 ${stat.color}`} />
                   </div>
-                  {stat.changeType !== "neutral" && (
-                    <span className={`text-xs font-medium flex items-center gap-0.5 ${stat.changeType === "increase" ? "text-destructive" : "text-success"}`}>
-                      {stat.changeType === "increase" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                      {stat.change}
-                    </span>
-                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mb-0.5">{stat.title}</p>
                 <p className="text-2xl font-bold">{stat.value}</p>
-                {stat.changeType === "neutral" && <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>}
+                {stat.change && <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>}
               </CardContent>
             </Card>
           );
@@ -82,10 +131,10 @@ const Dashboard = () => {
         </Card>
 
         <Card className="border-border/50">
-          <CardHeader><CardTitle>This Week's Usage</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Recent Daily Usage</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={dailyUsage}>
+              <BarChart data={recentUsage.length > 0 ? recentUsage : [{ day: "No Data", kwh: 0 }]}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
                 <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -102,7 +151,7 @@ const Dashboard = () => {
           <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-3">
             <Button variant="outline" className="h-auto py-5 justify-start" asChild>
-              <Link to="/pay-bill"><FileText className="mr-3 w-5 h-5" /><div className="text-left"><div className="font-semibold">Pay Bill</div><div className="text-sm text-muted-foreground">Due: $132.50</div></div></Link>
+              <Link to="/pay-bill"><FileText className="mr-3 w-5 h-5" /><div className="text-left"><div className="font-semibold">Pay Bill</div><div className="text-sm text-muted-foreground">Due: ${totalDue.toFixed(2)}</div></div></Link>
             </Button>
             <Button variant="outline" className="h-auto py-5 justify-start" asChild>
               <Link to="/consumption"><Activity className="mr-3 w-5 h-5" /><div className="text-left"><div className="font-semibold">View Usage</div><div className="text-sm text-muted-foreground">Detailed analytics</div></div></Link>
@@ -115,14 +164,17 @@ const Dashboard = () => {
             <CardTitle className="flex items-center gap-2"><AlertCircle className="w-5 h-5 text-warning" />Alerts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
-              <p className="font-medium text-sm mb-0.5">Bill Due Soon</p>
-              <p className="text-xs text-muted-foreground">$132.50 is due in 5 days</p>
-            </div>
-            <div className="p-3 rounded-lg bg-success/10 border border-success/20">
-              <p className="font-medium text-sm mb-0.5">Great Job!</p>
-              <p className="text-xs text-muted-foreground">Usage down 8% this month</p>
-            </div>
+            {unpaidBills.length > 0 ? (
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <p className="font-medium text-sm mb-0.5">Bill Due Soon</p>
+                <p className="text-xs text-muted-foreground">${totalDue.toFixed(2)} total due</p>
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+                <p className="font-medium text-sm mb-0.5">All Clear!</p>
+                <p className="text-xs text-muted-foreground">No pending bills</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { HelpCircle, Send } from "lucide-react";
+import { HelpCircle, Send, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const faqs = [
   { q: "How do I pay my bill online?", a: "Go to the 'Pay Bill' page from the sidebar. Select your payment method (UPI, Card, or Net Banking) and confirm the payment." },
@@ -19,12 +22,31 @@ const faqs = [
 
 const HelpSupport = () => {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [complaint, setComplaint] = useState({ subject: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!authLoading && !user) navigate("/auth");
+  }, [user, authLoading]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({ title: "Complaint Submitted", description: "We'll get back to you within 24 hours." });
-    setComplaint({ subject: "", message: "" });
+    if (!user) return;
+    setSubmitting(true);
+    const { error } = await supabase.from("complaints").insert({
+      user_id: user.id,
+      subject: complaint.subject,
+      message: complaint.message,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Complaint Submitted", description: "We'll get back to you within 24 hours." });
+      setComplaint({ subject: "", message: "" });
+    }
   };
 
   return (
@@ -58,7 +80,10 @@ const HelpSupport = () => {
                 <Label>Message</Label>
                 <Textarea value={complaint.message} onChange={(e) => setComplaint({ ...complaint, message: e.target.value })} placeholder="Describe your issue in detail..." rows={5} required />
               </div>
-              <Button type="submit" className="w-full"><Send className="mr-2 w-4 h-4" />Submit Complaint</Button>
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Send className="mr-2 w-4 h-4" />}
+                Submit Complaint
+              </Button>
             </form>
           </CardContent>
         </Card>

@@ -6,20 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import OtpModal from "@/components/OtpModal";
+import { useAuth } from "@/hooks/useAuth";
 
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signUp } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password !== form.confirm) {
       toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
@@ -30,16 +30,17 @@ const Register = () => {
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowOtp(true);
-    }, 1000);
-  };
-
-  const handleOtpVerify = () => {
-    setShowOtp(false);
-    toast({ title: "Success!", description: "Account created. Redirecting to login..." });
-    setTimeout(() => navigate("/auth"), 1500);
+    const { error } = await signUp(form.email, form.password, {
+      full_name: form.name,
+      phone: form.phone,
+    });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success!", description: "Please check your email to verify your account before logging in." });
+      setTimeout(() => navigate("/auth"), 2000);
+    }
   };
 
   return (
@@ -79,7 +80,7 @@ const Register = () => {
                 <Input id="confirm" name="confirm" type="password" placeholder="••••••••" value={form.confirm} onChange={handleChange} required />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending OTP...</> : "Register"}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Account...</> : "Register"}
               </Button>
             </form>
             <p className="text-center text-sm text-muted-foreground mt-6">
@@ -89,7 +90,6 @@ const Register = () => {
           </CardContent>
         </Card>
       </div>
-      <OtpModal open={showOtp} onOpenChange={setShowOtp} onVerify={handleOtpVerify} title="Verify Your Email" description={`We've sent a 6-digit code to ${form.email}`} />
     </div>
   );
 };

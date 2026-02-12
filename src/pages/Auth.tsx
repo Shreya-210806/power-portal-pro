@@ -6,39 +6,39 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, ArrowLeft, Loader2 } from "lucide-react";
-import OtpModal from "@/components/OtpModal";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(loginEmail, loginPassword);
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+    } else {
       toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
       navigate("/dashboard");
-    }, 1000);
+    }
   };
 
-  const handleOtpLogin = () => {
-    setShowOtp(true);
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/register");
-  };
-
-  const handleForgotPassword = (e: React.FormEvent) => {
-    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const email = (form.elements.namedItem("forgot-email") as HTMLInputElement).value;
+    const { supabase } = await import("@/integrations/supabase/client");
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    toast({ title: "Reset Email Sent", description: "Check your inbox for the password reset link." });
     setShowForgot(false);
-    setShowOtp(true);
   };
 
   return (
@@ -63,12 +63,12 @@ const Auth = () => {
           <CardContent>
             {showForgot ? (
               <form onSubmit={handleForgotPassword} className="space-y-4">
-                <p className="text-sm text-muted-foreground text-center mb-4">Enter your email to receive a reset OTP</p>
+                <p className="text-sm text-muted-foreground text-center mb-4">Enter your email to receive a reset link</p>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input type="email" placeholder="your@email.com" required />
+                  <Input name="forgot-email" type="email" placeholder="your@email.com" required />
                 </div>
-                <Button type="submit" className="w-full">Send OTP</Button>
+                <Button type="submit" className="w-full">Send Reset Link</Button>
                 <button type="button" onClick={() => setShowForgot(false)} className="w-full text-sm text-primary hover:underline">Back to Login</button>
               </form>
             ) : (
@@ -81,19 +81,18 @@ const Auth = () => {
                 <TabsContent value="login">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-email">Email / Phone</Label>
-                      <Input id="login-email" placeholder="your@email.com" required />
+                      <Label htmlFor="login-email">Email</Label>
+                      <Input id="login-email" type="email" placeholder="your@email.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="login-password">Password</Label>
-                      <Input id="login-password" type="password" placeholder="••••••••" required />
+                      <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
                     </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Logging in...</> : "Login"}
                     </Button>
-                    <div className="flex items-center justify-between text-sm">
-                      <button type="button" onClick={() => setShowForgot(true)} className="text-primary hover:underline">Forgot password?</button>
-                      <button type="button" onClick={handleOtpLogin} className="text-primary hover:underline">Login with OTP</button>
+                    <div className="text-center">
+                      <button type="button" onClick={() => setShowForgot(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
                     </div>
                   </form>
                 </TabsContent>
@@ -113,7 +112,6 @@ const Auth = () => {
           </CardContent>
         </Card>
       </div>
-      <OtpModal open={showOtp} onOpenChange={setShowOtp} onVerify={() => { setShowOtp(false); navigate("/dashboard"); }} />
     </div>
   );
 };

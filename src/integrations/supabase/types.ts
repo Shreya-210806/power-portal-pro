@@ -14,16 +14,312 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_reminders: {
+        Row: {
+          admin_user_id: string | null
+          created_at: string
+          id: string
+          message: string
+          recipient_count: number
+          target: string
+        }
+        Insert: {
+          admin_user_id?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          recipient_count?: number
+          target: string
+        }
+        Update: {
+          admin_user_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          recipient_count?: number
+          target?: string
+        }
+        Relationships: []
+      }
+      bills: {
+        Row: {
+          amount: number
+          bill_number: string
+          billing_month: string
+          consumer_id: string | null
+          created_at: string
+          due_date: string
+          id: string
+          status: string
+          units_consumed: number
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          bill_number: string
+          billing_month: string
+          consumer_id?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          status?: string
+          units_consumed?: number
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bill_number?: string
+          billing_month?: string
+          consumer_id?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          status?: string
+          units_consumed?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "consumers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      complaints: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          status: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          status?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          status?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      consumers: {
+        Row: {
+          address: string | null
+          consumer_no: string
+          created_at: string
+          id: string
+          meter_no: string
+          name: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          consumer_no: string
+          created_at?: string
+          id?: string
+          meter_no: string
+          name: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          consumer_no?: string
+          created_at?: string
+          id?: string
+          meter_no?: string
+          name?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          bill_id: string | null
+          created_at: string
+          id: string
+          payment_method: string
+          status: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bill_id?: string | null
+          created_at?: string
+          id?: string
+          payment_method?: string
+          status?: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bill_id?: string | null
+          created_at?: string
+          id?: string
+          payment_method?: string
+          status?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_data: {
+        Row: {
+          consumer_id: string | null
+          created_at: string
+          date: string
+          id: string
+          kwh: number
+          user_id: string
+        }
+        Insert: {
+          consumer_id?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          kwh?: number
+          user_id: string
+        }
+        Update: {
+          consumer_id?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          kwh?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_data_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "consumers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +446,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

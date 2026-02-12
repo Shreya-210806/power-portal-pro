@@ -1,45 +1,68 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { PlusCircle, Users, Trash2 } from "lucide-react";
+import { PlusCircle, Users, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface Consumer {
-  id: string;
-  name: string;
-  consumerNo: string;
-  meterNo: string;
-  address: string;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Consumers = () => {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [consumers, setConsumers] = useState<Consumer[]>([
-    { id: "1", name: "Home", consumerNo: "CON-001234", meterNo: "MTR-5678", address: "123 Main St" },
-    { id: "2", name: "Office", consumerNo: "CON-005678", meterNo: "MTR-9012", address: "456 Business Ave" },
-  ]);
+  const [consumers, setConsumers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: "", consumerNo: "", meterNo: "", address: "" });
 
-  const handleAdd = () => {
+  useEffect(() => {
+    if (!authLoading && !user) { navigate("/auth"); return; }
+    if (user) fetchConsumers();
+  }, [user, authLoading]);
+
+  const fetchConsumers = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("consumers").select("*").eq("user_id", user!.id).order("created_at", { ascending: false });
+    setConsumers(data || []);
+    setLoading(false);
+  };
+
+  const handleAdd = async () => {
     if (!form.name || !form.consumerNo || !form.meterNo) {
       toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
       return;
     }
-    setConsumers([...consumers, { ...form, id: Date.now().toString() }]);
-    setForm({ name: "", consumerNo: "", meterNo: "", address: "" });
-    setOpen(false);
-    toast({ title: "Consumer Added" });
+    const { error } = await supabase.from("consumers").insert({
+      user_id: user!.id,
+      name: form.name,
+      consumer_no: form.consumerNo,
+      meter_no: form.meterNo,
+      address: form.address,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setForm({ name: "", consumerNo: "", meterNo: "", address: "" });
+      setOpen(false);
+      toast({ title: "Consumer Added" });
+      fetchConsumers();
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setConsumers(consumers.filter((c) => c.id !== id));
+  const handleDelete = async (id: string) => {
+    await supabase.from("consumers").delete().eq("id", id);
     toast({ title: "Consumer Removed" });
+    fetchConsumers();
   };
+
+  if (authLoading || loading) {
+    return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
+  }
 
   return (
     <DashboardLayout>
@@ -65,28 +88,32 @@ const Consumers = () => {
         </Dialog>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {consumers.map((c) => (
-          <Card key={c.id} className="border-border/50 hover:shadow-md transition-shadow">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary" />
+      {consumers.length === 0 ? (
+        <Card className="border-border/50"><CardContent className="py-12 text-center text-muted-foreground">No consumers added yet. Click "Add Consumer" to get started.</CardContent></Card>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {consumers.map((c) => (
+            <Card key={c.id} className="border-border/50 hover:shadow-md transition-shadow">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </div>
-              <h3 className="font-semibold text-lg mb-2">{c.name}</h3>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>Consumer: {c.consumerNo}</p>
-                <p>Meter: {c.meterNo}</p>
-                <p>{c.address}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <h3 className="font-semibold text-lg mb-2">{c.name}</h3>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <p>Consumer: {c.consumer_no}</p>
+                  <p>Meter: {c.meter_no}</p>
+                  <p>{c.address}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </DashboardLayout>
   );
 };
