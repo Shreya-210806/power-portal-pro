@@ -99,7 +99,7 @@ const Auth = () => {
 
                 <TabsContent value="signup">
                   <div className="text-center space-y-4">
-                    <p className="text-muted-foreground">Create a new account to get started</p>
+                    <p className="text-muted-foreground">Create a new account with your consumer details</p>
                     <Button className="w-full" asChild><Link to="/register">Create Account</Link></Button>
                   </div>
                 </TabsContent>
