@@ -67,7 +67,7 @@ const Register = () => {
               <Zap className="w-7 h-7 text-primary-foreground" />
             </div>
             <CardTitle className="text-2xl">Create Account</CardTitle>
-            <CardDescription>Join PowerGrid to manage your energy</CardDescription>
+            <CardDescription>Join Esyasoft to manage your energy</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
