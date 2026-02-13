@@ -56,7 +56,7 @@ const Auth = () => {
               </div>
             </div>
             <div className="text-center">
-              <CardTitle className="text-2xl">Welcome to PowerGrid</CardTitle>
+              <CardTitle className="text-2xl">Welcome to Esyasoft</CardTitle>
               <CardDescription className="text-base mt-1">Manage your energy, control your costs</CardDescription>
             </div>
           </CardHeader>

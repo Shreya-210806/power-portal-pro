@@ -51,7 +51,7 @@ export function AppSidebar() {
             <Zap className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            PowerGrid
+            Esyasoft
           </span>
         </NavLink>
       </SidebarHeader>

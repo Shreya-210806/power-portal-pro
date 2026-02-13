@@ -171,7 +171,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
               <Zap className="w-6 h-6 text-primary" />
-              <span className="font-bold text-lg">PowerGrid</span>
+              <span className="font-bold text-lg">Esyasoft</span>
             </div>
             <div className="flex gap-6 text-sm text-muted-foreground">
               <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
@@ -179,7 +179,7 @@ const Index = () => {
               <a href="#" className="hover:text-foreground transition-colors">Contact</a>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 PowerGrid. All rights reserved.
+              © 2024 Esyasoft. All rights reserved.
             </p>
           </div>
         </div>
