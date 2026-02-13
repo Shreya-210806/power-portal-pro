@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "", consumerNo: "", consumerName: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
   const { signUp } = useAuth();
@@ -30,16 +30,28 @@ const Register = () => {
       return;
     }
     setIsLoading(true);
-    const { error } = await signUp(form.email, form.password, {
+    const { error, data } = await signUp(form.email, form.password, {
       full_name: form.name,
       phone: form.phone,
+      consumer_no: form.consumerNo,
+      consumer_name: form.consumerName,
     });
     setIsLoading(false);
     if (error) {
       toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Success!", description: "Please check your email to verify your account before logging in." });
-      setTimeout(() => navigate("/auth"), 2000);
+      // Auto-create consumer record
+      if (data?.user) {
+        const { supabase } = await import("@/integrations/supabase/client");
+        await supabase.from("consumers").insert({
+          user_id: data.user.id,
+          name: form.consumerName,
+          consumer_no: form.consumerNo,
+          meter_no: "",
+        });
+      }
+      toast({ title: "Success!", description: "Account created successfully. Redirecting..." });
+      navigate("/dashboard");
     }
   };
 
@@ -70,6 +82,14 @@ const Register = () => {
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" name="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="consumerNo">Consumer Number</Label>
+                <Input id="consumerNo" name="consumerNo" placeholder="e.g. CON-12345" value={form.consumerNo} onChange={handleChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="consumerName">Consumer Name</Label>
+                <Input id="consumerName" name="consumerName" placeholder="Account holder name" value={form.consumerName} onChange={handleChange} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
