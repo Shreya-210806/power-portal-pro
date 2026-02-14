@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Zap, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import CaptchaCheckbox from "@/components/CaptchaCheckbox";
 
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "", consumerNo: "", consumerName: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -21,6 +23,10 @@ const Register = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!captchaVerified) {
+      toast({ title: "Error", description: "Please verify you're not a robot", variant: "destructive" });
+      return;
+    }
     if (form.password !== form.confirm) {
       toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
       return;
@@ -99,7 +105,8 @@ const Register = () => {
                 <Label htmlFor="confirm">Confirm Password</Label>
                 <Input id="confirm" name="confirm" type="password" placeholder="••••••••" value={form.confirm} onChange={handleChange} required />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <CaptchaCheckbox onVerified={setCaptchaVerified} />
+              <Button type="submit" className="w-full" disabled={isLoading || !captchaVerified}>
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Account...</> : "Register"}
               </Button>
             </form>

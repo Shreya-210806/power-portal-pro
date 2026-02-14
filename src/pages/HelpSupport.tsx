@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { HelpCircle, Send, Loader2 } from "lucide-react";
+import { HelpCircle, Send, Loader2, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import RatingWidget from "@/components/RatingWidget";
 
 const faqs = [
   { q: "How do I pay my bill online?", a: "Go to the 'Pay Bill' page from the sidebar. Select your payment method (UPI, Card, or Net Banking) and confirm the payment." },
@@ -18,6 +19,13 @@ const faqs = [
   { q: "What if my payment fails?", a: "If a payment fails, the amount will be refunded within 3-5 business days. You can retry payment from the Bills section." },
   { q: "How do I download my bill?", a: "Go to the Bills page and click the download icon next to the bill you want to download as a PDF." },
   { q: "How to set up auto-pay?", a: "Visit the Bills page and select the Auto-Pay option. Link your preferred payment method to enable automatic payments." },
+];
+
+const tips = [
+  "Use LED bulbs — they consume 75% less energy than traditional bulbs.",
+  "Unplug devices when not in use to avoid phantom power consumption.",
+  "Set your AC to 24°C for optimal energy efficiency.",
+  "Use natural light during daytime to reduce electricity usage.",
 ];
 
 const HelpSupport = () => {
@@ -51,11 +59,14 @@ const HelpSupport = () => {
 
   return (
     <DashboardLayout>
-      <h1 className="text-3xl font-bold mb-6">Help & Support</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-1">Help & Support</h1>
+        <p className="text-muted-foreground">Get answers, submit complaints, or share feedback</p>
+      </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
         <Card className="border-border/50">
-          <CardHeader><CardTitle className="flex items-center gap-2"><HelpCircle className="w-5 h-5" />Frequently Asked Questions</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><HelpCircle className="w-5 h-5 text-primary" />Frequently Asked Questions</CardTitle></CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
               {faqs.map((faq, i) => (
@@ -68,26 +79,45 @@ const HelpSupport = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
-          <CardHeader><CardTitle className="flex items-center gap-2"><Send className="w-5 h-5" />Submit a Complaint</CardTitle></CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Subject</Label>
-                <Input value={complaint.subject} onChange={(e) => setComplaint({ ...complaint, subject: e.target.value })} placeholder="Brief description" required />
-              </div>
-              <div className="space-y-2">
-                <Label>Message</Label>
-                <Textarea value={complaint.message} onChange={(e) => setComplaint({ ...complaint, message: e.target.value })} placeholder="Describe your issue in detail..." rows={5} required />
-              </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Send className="mr-2 w-4 h-4" />}
-                Submit Complaint
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card className="border-border/50">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Send className="w-5 h-5 text-primary" />Submit a Complaint</CardTitle></CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Input value={complaint.subject} onChange={(e) => setComplaint({ ...complaint, subject: e.target.value })} placeholder="Brief description" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Message</Label>
+                  <Textarea value={complaint.message} onChange={(e) => setComplaint({ ...complaint, message: e.target.value })} placeholder="Describe your issue in detail..." rows={4} required />
+                </div>
+                <Button type="submit" className="w-full" disabled={submitting}>
+                  {submitting ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Send className="mr-2 w-4 h-4" />}
+                  Submit Complaint
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <RatingWidget />
+        </div>
       </div>
+
+      {/* Energy Saving Tips */}
+      <Card className="border-border/50">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Lightbulb className="w-5 h-5 text-warning" />Energy Saving Tips</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {tips.map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+                <span className="w-6 h-6 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                <p className="text-sm text-muted-foreground">{tip}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </DashboardLayout>
   );
 };

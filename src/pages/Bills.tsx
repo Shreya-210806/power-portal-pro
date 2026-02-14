@@ -8,6 +8,7 @@ import { Download, CreditCard, Calendar, DollarSign, Loader2 } from "lucide-reac
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { generateBillPdf } from "@/utils/generateBillPdf";
 
 const Bills = () => {
   const { user, loading: authLoading } = useAuth();
@@ -93,7 +94,7 @@ const Bills = () => {
                       <p className="text-xs text-muted-foreground">Due: {new Date(bill.due_date).toLocaleDateString()}</p>
                     </div>
                     <Badge variant={bill.status === "paid" ? "secondary" : "destructive"} className="capitalize">{bill.status}</Badge>
-                    <Button variant="outline" size="icon"><Download className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="icon" onClick={() => generateBillPdf(bill)} title="Download PDF"><Download className="w-4 h-4" /></Button>
                   </div>
                 </div>
               ))}
