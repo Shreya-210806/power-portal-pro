@@ -252,6 +252,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ratings: {
+        Row: {
+          category: string
+          created_at: string
+          feedback: string | null
+          id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage_data: {
         Row: {
           consumer_id: string | null

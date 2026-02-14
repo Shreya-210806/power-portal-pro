@@ -2,3 +2,6 @@ project_id = "kltpktmxryfkptaxjavi"
 
 [functions.create-razorpay-order]
 verify_jwt = false
+
+[functions.send-bill-reminders]
+verify_jwt = false
