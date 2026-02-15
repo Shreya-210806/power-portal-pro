@@ -115,6 +115,88 @@ export type Database = {
         }
         Relationships: []
       }
+      consumer_bill_detail: {
+        Row: {
+          bill_amount: number
+          bill_date: string
+          bill_sequence: number
+          consumer_number: string
+          created_at: string
+          due_date: string
+          prompt_amount: number
+          prompt_date: string
+          user_id: string
+        }
+        Insert: {
+          bill_amount?: number
+          bill_date: string
+          bill_sequence?: never
+          consumer_number: string
+          created_at?: string
+          due_date: string
+          prompt_amount?: number
+          prompt_date: string
+          user_id: string
+        }
+        Update: {
+          bill_amount?: number
+          bill_date?: string
+          bill_sequence?: never
+          consumer_number?: string
+          created_at?: string
+          due_date?: string
+          prompt_amount?: number
+          prompt_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumer_bill_detail_consumer_number_fkey"
+            columns: ["consumer_number"]
+            isOneToOne: false
+            referencedRelation: "consumers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consumer_payment_detail: {
+        Row: {
+          amount_paid: number
+          consumer_number: string
+          created_at: string
+          entry_date_time: string
+          payment_date_time: string
+          payment_sequence: number
+          user_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          consumer_number: string
+          created_at?: string
+          entry_date_time?: string
+          payment_date_time: string
+          payment_sequence?: never
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          consumer_number?: string
+          created_at?: string
+          entry_date_time?: string
+          payment_date_time?: string
+          payment_sequence?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumer_payment_detail_consumer_number_fkey"
+            columns: ["consumer_number"]
+            isOneToOne: false
+            referencedRelation: "consumers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consumers: {
         Row: {
           address: string | null
