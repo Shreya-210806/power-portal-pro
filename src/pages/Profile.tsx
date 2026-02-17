@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, Lock, Save, Loader2 } from "lucide-react";
+import { User, Lock, Save, Loader2, Mail, Phone, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { motion } from "framer-motion";
+
+const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 
 const Profile = () => {
   const { toast } = useToast();
@@ -35,9 +37,7 @@ const Profile = () => {
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from("profiles").update({
-      full_name: profile.full_name,
-      phone: profile.phone,
-      address: profile.address,
+      full_name: profile.full_name, phone: profile.phone, address: profile.address,
     }).eq("user_id", user!.id);
     setSaving(false);
     if (error) {
@@ -71,58 +71,74 @@ const Profile = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">My Profile</h1>
+      <motion.div className="max-w-2xl mx-auto" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
+        <motion.div variants={fadeUp} className="mb-6">
+          <h1 className="text-3xl font-bold mb-1">My Profile</h1>
+          <p className="text-muted-foreground">Manage your account settings</p>
+        </motion.div>
 
-        <Card className="mb-6 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><User className="w-5 h-5" />Personal Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
+        <motion.div variants={fadeUp}>
+          <Card className="mb-6 border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg"><User className="w-5 h-5 text-primary" />Personal Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Full Name</Label>
+                  <Input value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Email</Label>
+                  <div className="relative">
+                    <Input value={profile.email} disabled className="opacity-60 pl-9" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Phone</Label>
+                  <div className="relative">
+                    <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} className="pl-9" />
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Address</Label>
+                  <div className="relative">
+                    <Input value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} className="pl-9" />
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={profile.email} disabled className="opacity-60" />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Input value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} />
-              </div>
-            </div>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Save className="mr-2 w-4 h-4" />}
-              Save Changes
-            </Button>
-          </CardContent>
-        </Card>
+              <Button onClick={handleSave} disabled={saving} className="gap-2">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Changes
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" />Change Password</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>New Password</Label>
-                <Input type="password" placeholder="••••••••" value={passwords.new_password} onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} />
+        <motion.div variants={fadeUp}>
+          <Card className="border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg"><Lock className="w-5 h-5 text-primary" />Change Password</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">New Password</Label>
+                  <Input type="password" placeholder="••••••••" value={passwords.new_password} onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Confirm New Password</Label>
+                  <Input type="password" placeholder="••••••••" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Confirm New Password</Label>
-                <Input type="password" placeholder="••••••••" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} />
-              </div>
-            </div>
-            <Button variant="outline" onClick={handlePasswordChange}>Update Password</Button>
-          </CardContent>
-        </Card>
-      </div>
+              <Button variant="outline" onClick={handlePasswordChange}>Update Password</Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
     </DashboardLayout>
   );
 };

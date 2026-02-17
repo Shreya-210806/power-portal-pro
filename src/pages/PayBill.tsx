@@ -5,16 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Smartphone, Building2, CheckCircle2, Loader2 } from "lucide-react";
+import { CreditCard, Smartphone, Building2, CheckCircle2, Loader2, Download, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { generateReceiptPdf } from "@/utils/generateReceiptPdf";
+import { generateBillPdf } from "@/utils/generateBillPdf";
+import { motion } from "framer-motion";
 
 declare global {
   interface Window {
     Razorpay: any;
   }
 }
+
+const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 
 const PayBill = () => {
   const { toast } = useToast();
@@ -51,7 +56,6 @@ const PayBill = () => {
     setPaying(true);
 
     try {
-      // Step 1: Create Razorpay order via backend edge function
       const { data: orderData, error: orderError } = await supabase.functions.invoke("create-razorpay-order", {
         body: {
           amount: Number(bill.amount),
@@ -65,7 +69,6 @@ const PayBill = () => {
         throw new Error(orderError?.message || "Failed to create payment order");
       }
 
-      // Step 2: Open Razorpay Checkout
       const options = {
         key: orderData.key_id,
         amount: orderData.amount,
@@ -73,9 +76,7 @@ const PayBill = () => {
         name: "Esyasoft Energy",
         description: `Bill Payment - ${bill.billing_month}`,
         order_id: orderData.order_id,
-        prefill: {
-          email: user?.email || "",
-        },
+        prefill: { email: user?.email || "" },
         theme: { color: "#10b981" },
         method: {
           upi: method === "upi",
@@ -85,7 +86,6 @@ const PayBill = () => {
           paylater: false,
         },
         handler: async (response: any) => {
-          // Step 3: Payment successful - save to database
           const generatedTxnId = response.razorpay_payment_id || "TXN-" + Date.now().toString().slice(-8);
 
           const { error: payError } = await supabase.from("payments").insert({
@@ -136,6 +136,23 @@ const PayBill = () => {
     }
   };
 
+  const handleDownloadReceipt = () => {
+    if (!bill || !txnId) return;
+    generateReceiptPdf({
+      transactionId: txnId,
+      amount: Number(bill.amount),
+      billNumber: bill.bill_number,
+      billingMonth: bill.billing_month,
+      paymentMethod: method,
+      date: new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }),
+    });
+  };
+
+  const handleDownloadBill = () => {
+    if (!bill) return;
+    generateBillPdf(bill);
+  };
+
   if (authLoading || loading) {
     return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
   }
@@ -143,23 +160,58 @@ const PayBill = () => {
   if (success && bill) {
     return (
       <DashboardLayout>
-        <div className="max-w-md mx-auto text-center py-20">
-          <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-success" />
-          </div>
-          <h1 className="text-3xl font-bold mb-2">Payment Successful!</h1>
-          <p className="text-muted-foreground mb-2">Your bill has been paid successfully via Razorpay.</p>
-          <p className="text-sm text-muted-foreground mb-6">Transaction ID: {txnId}</p>
-          <div className="space-y-3">
-            <Card className="border-border/50">
-              <CardContent className="p-4 flex justify-between">
-                <span className="text-muted-foreground">Amount Paid</span>
-                <span className="font-bold text-lg">₹{Number(bill.amount).toFixed(2)}</span>
+        <motion.div className="max-w-lg mx-auto py-12" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
+          <motion.div variants={fadeUp} className="text-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6 ring-4 ring-success/20">
+              <CheckCircle2 className="w-10 h-10 text-success" />
+            </div>
+            <h1 className="text-3xl font-bold mb-2">Payment Successful!</h1>
+            <p className="text-muted-foreground">Your bill has been paid successfully via Razorpay.</p>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <Card className="border-border/50 mb-4 overflow-hidden">
+              <div className="bg-gradient-to-r from-success to-accent p-4 text-accent-foreground text-center">
+                <p className="text-sm opacity-90">Amount Paid</p>
+                <p className="text-3xl font-bold">₹{Number(bill.amount).toFixed(2)}</p>
+              </div>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Transaction ID</span>
+                  <span className="font-mono font-medium">{txnId}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Bill Number</span>
+                  <span className="font-medium">{bill.bill_number}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Billing Month</span>
+                  <span className="font-medium">{bill.billing_month}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Payment Method</span>
+                  <span className="font-medium capitalize">{method}</span>
+                </div>
               </CardContent>
             </Card>
-            <Button onClick={() => navigate("/bills")} variant="outline" className="w-full">View All Bills</Button>
-          </div>
-        </div>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button onClick={handleDownloadReceipt} variant="outline" className="h-12 gap-2">
+                <Download className="w-4 h-4" />
+                Receipt PDF
+              </Button>
+              <Button onClick={handleDownloadBill} variant="outline" className="h-12 gap-2">
+                <FileText className="w-4 h-4" />
+                Bill PDF
+              </Button>
+            </div>
+            <Button onClick={() => navigate("/bills")} variant="secondary" className="w-full h-12">
+              View All Bills
+            </Button>
+          </motion.div>
+        </motion.div>
       </DashboardLayout>
     );
   }
@@ -167,58 +219,65 @@ const PayBill = () => {
   if (!bill) {
     return (
       <DashboardLayout>
-        <div className="max-w-lg mx-auto text-center py-20">
-          <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
+        <motion.div className="max-w-lg mx-auto text-center py-20" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-success" />
+          </div>
           <h1 className="text-2xl font-bold mb-2">No Pending Bills</h1>
           <p className="text-muted-foreground">All your bills are paid. Great job!</p>
-        </div>
+        </motion.div>
       </DashboardLayout>
     );
   }
 
   return (
     <DashboardLayout>
-      <div className="max-w-lg mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Pay Bill</h1>
+      <motion.div className="max-w-lg mx-auto" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
+        <motion.h1 variants={fadeUp} className="text-3xl font-bold mb-6">Pay Bill</motion.h1>
 
-        <Card className="mb-6 border-border/50 bg-gradient-card">
-          <CardHeader><CardTitle>Bill Summary</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between"><span className="text-muted-foreground">Bill Number</span><span className="font-medium">{bill.bill_number}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Billing Month</span><span className="font-medium">{bill.billing_month}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Units Consumed</span><span className="font-medium">{Number(bill.units_consumed).toLocaleString()} kWh</span></div>
-            <div className="flex justify-between border-t border-border pt-3"><span className="font-semibold">Total Amount</span><span className="font-bold text-xl text-primary">₹{Number(bill.amount).toFixed(2)}</span></div>
-          </CardContent>
-        </Card>
+        <motion.div variants={fadeUp}>
+          <Card className="mb-6 border-border/50 overflow-hidden">
+            <div className="bg-gradient-to-r from-primary to-primary/80 p-4">
+              <p className="text-primary-foreground/80 text-sm">Total Amount Due</p>
+              <p className="text-3xl font-bold text-primary-foreground">₹{Number(bill.amount).toFixed(2)}</p>
+            </div>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Bill Number</span><span className="font-medium">{bill.bill_number}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Billing Month</span><span className="font-medium">{bill.billing_month}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Units Consumed</span><span className="font-medium">{Number(bill.units_consumed).toLocaleString()} kWh</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Due Date</span><span className="font-medium">{new Date(bill.due_date).toLocaleDateString("en-IN")}</span></div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="mb-6 border-border/50">
-          <CardHeader><CardTitle>Payment Method</CardTitle></CardHeader>
-          <CardContent>
-            <RadioGroup value={method} onValueChange={setMethod} className="space-y-3">
-              <Label htmlFor="upi" className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <RadioGroupItem value="upi" id="upi" />
-                <Smartphone className="w-5 h-5 text-primary" />
-                <div><p className="font-medium">UPI</p><p className="text-xs text-muted-foreground">Google Pay, PhonePe, Paytm</p></div>
-              </Label>
-              <Label htmlFor="card" className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <RadioGroupItem value="card" id="card" />
-                <CreditCard className="w-5 h-5 text-primary" />
-                <div><p className="font-medium">Credit / Debit Card</p><p className="text-xs text-muted-foreground">Visa, Mastercard, RuPay</p></div>
-              </Label>
-              <Label htmlFor="netbanking" className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <RadioGroupItem value="netbanking" id="netbanking" />
-                <Building2 className="w-5 h-5 text-primary" />
-                <div><p className="font-medium">Net Banking</p><p className="text-xs text-muted-foreground">All major Indian banks</p></div>
-              </Label>
-            </RadioGroup>
-          </CardContent>
-        </Card>
+        <motion.div variants={fadeUp}>
+          <Card className="mb-6 border-border/50">
+            <CardHeader className="pb-3"><CardTitle className="text-lg">Payment Method</CardTitle></CardHeader>
+            <CardContent>
+              <RadioGroup value={method} onValueChange={setMethod} className="space-y-3">
+                {[
+                  { value: "upi", icon: Smartphone, label: "UPI", desc: "Google Pay, PhonePe, Paytm" },
+                  { value: "card", icon: CreditCard, label: "Credit / Debit Card", desc: "Visa, Mastercard, RuPay" },
+                  { value: "netbanking", icon: Building2, label: "Net Banking", desc: "All major Indian banks" },
+                ].map((opt) => (
+                  <Label key={opt.value} htmlFor={opt.value} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-all has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:shadow-sm">
+                    <RadioGroupItem value={opt.value} id={opt.value} />
+                    <opt.icon className="w-5 h-5 text-primary" />
+                    <div><p className="font-medium">{opt.label}</p><p className="text-xs text-muted-foreground">{opt.desc}</p></div>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Button onClick={handlePay} className="w-full h-12 text-lg" disabled={paying}>
-          {paying ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing...</> : `Pay ₹${Number(bill.amount).toFixed(2)}`}
-        </Button>
-        <p className="text-xs text-muted-foreground text-center mt-3">Secured by Razorpay • 256-bit encryption</p>
-      </div>
+        <motion.div variants={fadeUp}>
+          <Button onClick={handlePay} className="w-full h-12 text-lg font-semibold" disabled={paying}>
+            {paying ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing...</> : `Pay ₹${Number(bill.amount).toFixed(2)}`}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-3">Secured by Razorpay • 256-bit encryption</p>
+        </motion.div>
+      </motion.div>
     </DashboardLayout>
   );
 };

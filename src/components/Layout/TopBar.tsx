@@ -1,4 +1,4 @@
-import { Bell, Moon, Sun, User } from "lucide-react";
+import { Bell, Moon, Sun, User, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "@/hooks/useTheme";
@@ -34,30 +34,33 @@ export function TopBar() {
   }, [user]);
 
   return (
-    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-lg flex items-center justify-between px-4 sticky top-0 z-40">
-      <div className="flex items-center gap-2">
-        <SidebarTrigger />
+    <header className="h-16 border-b border-border bg-card/60 backdrop-blur-xl flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
+      <div className="flex items-center gap-3">
+        <SidebarTrigger className="hover:bg-muted transition-colors" />
+        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Esyasoft</span>
+          <span>/</span>
+          <span>Portal</span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-lg hover:bg-muted">
+          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
         </Button>
         
-        <Button variant="ghost" size="icon" className="relative" asChild>
+        <Button variant="ghost" size="icon" className="relative rounded-lg hover:bg-muted" asChild>
           <Link to="/notifications">
-            <Bell className="h-4 w-4" />
+            <Bell className="h-[18px] w-[18px]" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full ring-2 ring-card" />
             )}
           </Link>
         </Button>
         
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" className="rounded-lg" asChild>
           <Link to="/profile">
-            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-border">
               <User className="h-4 w-4 text-primary" />
             </div>
           </Link>
