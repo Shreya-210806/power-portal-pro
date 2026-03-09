@@ -7,22 +7,34 @@ import { Loader2, ShieldCheck } from "lucide-react";
 interface OtpModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onVerify: (otp: string) => void;
+  onVerify: (otp: string) => Promise<boolean> | void;
+  onResend?: () => void;
   title?: string;
   description?: string;
+  loading?: boolean;
 }
 
-const OtpModal = ({ open, onOpenChange, onVerify, title = "Verify OTP", description = "Enter the 6-digit code sent to your email/phone" }: OtpModalProps) => {
+// OTP verification modal with 6-digit input
+const OtpModal = ({
+  open,
+  onOpenChange,
+  onVerify,
+  onResend,
+  title = "Verify OTP",
+  description = "Enter the 6-digit code sent to your email",
+  loading: externalLoading,
+}: OtpModalProps) => {
   const [otp, setOtp] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [internalLoading, setInternalLoading] = useState(false);
+
+  const isLoading = externalLoading ?? internalLoading;
 
   const handleVerify = async () => {
-    setLoading(true);
-    setTimeout(() => {
-      onVerify(otp);
-      setLoading(false);
-      setOtp("");
-    }, 1500);
+    if (otp.length < 6) return;
+    setInternalLoading(true);
+    await onVerify(otp);
+    setInternalLoading(false);
+    setOtp("");
   };
 
   return (
@@ -46,10 +58,14 @@ const OtpModal = ({ open, onOpenChange, onVerify, title = "Verify OTP", descript
               <InputOTPSlot index={5} />
             </InputOTPGroup>
           </InputOTP>
-          <Button onClick={handleVerify} disabled={otp.length < 6 || loading} className="w-full">
-            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</> : "Verify"}
+          <Button onClick={handleVerify} disabled={otp.length < 6 || isLoading} className="w-full">
+            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</> : "Verify"}
           </Button>
-          <button className="text-sm text-primary hover:underline">Resend OTP</button>
+          {onResend && (
+            <button type="button" onClick={onResend} className="text-sm text-primary hover:underline">
+              Resend OTP
+            </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

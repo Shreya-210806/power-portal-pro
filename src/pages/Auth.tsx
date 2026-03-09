@@ -8,34 +8,109 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import OtpModal from "@/components/OtpModal";
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  // Login OTP state
+  const [showLoginOtp, setShowLoginOtp] = useState(false);
+  const [loginDemoOtp, setLoginDemoOtp] = useState("");
+  const [pendingLoginSession, setPendingLoginSession] = useState<any>(null);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { signIn } = useAuth();
 
+  // Step 1: Validate credentials, then send OTP for extra security
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
-    setIsLoading(false);
+
+    // First authenticate with email + password
+    const { data, error } = await signIn(loginEmail, loginPassword);
     if (error) {
       toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+
+    // Get consumer number from user metadata to send login OTP
+    const consumerNo = data?.user?.user_metadata?.consumer_no;
+    if (consumerNo) {
+      // Send login OTP for extra security
+      try {
+        const { data: otpData } = await supabase.functions.invoke("consumer-auth", {
+          body: {
+            action: "send-otp",
+            consumer_number: consumerNo,
+            purpose: "login",
+          },
+        });
+
+        if (otpData?.demo_otp) {
+          setLoginDemoOtp(otpData.demo_otp);
+        }
+
+        setPendingLoginSession(data);
+        setShowLoginOtp(true);
+        toast({ title: "OTP Sent", description: "Enter the OTP sent to your registered email" });
+      } catch {
+        // If OTP sending fails, allow login anyway
+        toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
+        navigate("/dashboard");
+      }
     } else {
+      // No consumer number (admin or old user) - skip OTP
       toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
       navigate("/dashboard");
     }
+
+    setIsLoading(false);
+  };
+
+  // Step 2: Verify login OTP
+  const handleLoginOtpVerify = async (otp: string) => {
+    const consumerNo = pendingLoginSession?.user?.user_metadata?.consumer_no;
+
+    const { data, error } = await supabase.functions.invoke("consumer-auth", {
+      body: {
+        action: "verify-otp",
+        consumer_number: consumerNo,
+        otp,
+        purpose: "login",
+      },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Invalid OTP", description: data?.error || "Please try again", variant: "destructive" });
+      return false;
+    }
+
+    toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
+    navigate("/dashboard");
+    return true;
+  };
+
+  // Resend login OTP
+  const handleResendLoginOtp = async () => {
+    const consumerNo = pendingLoginSession?.user?.user_metadata?.consumer_no;
+    if (!consumerNo) return;
+
+    const { data } = await supabase.functions.invoke("consumer-auth", {
+      body: { action: "send-otp", consumer_number: consumerNo, purpose: "login" },
+    });
+    if (data?.demo_otp) setLoginDemoOtp(data.demo_otp);
+    toast({ title: "OTP Resent", description: "A new verification code has been sent" });
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     const email = (form.elements.namedItem("forgot-email") as HTMLInputElement).value;
-    const { supabase } = await import("@/integrations/supabase/client");
     await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
     toast({ title: "Reset Email Sent", description: "Check your inbox for the password reset link." });
     setShowForgot(false);
@@ -111,7 +186,34 @@ const Auth = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Demo OTP display for login */}
+        {showLoginOtp && loginDemoOtp && (
+          <Card className="mt-4 border-warning/30 bg-warning/5">
+            <CardContent className="p-4 text-center">
+              <p className="font-medium text-sm text-warning">Demo Login OTP</p>
+              <p className="text-2xl font-mono font-bold tracking-widest mt-1">{loginDemoOtp}</p>
+              <p className="text-xs text-muted-foreground mt-1">In production, sent to email only</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Login OTP Modal */}
+      <OtpModal
+        open={showLoginOtp}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowLoginOtp(false);
+            // Sign out if OTP is cancelled
+            supabase.auth.signOut();
+          }
+        }}
+        onVerify={handleLoginOtpVerify}
+        onResend={handleResendLoginOtp}
+        title="Login Verification"
+        description="Enter the OTP sent to your registered email for extra security"
+      />
     </div>
   );
 };
