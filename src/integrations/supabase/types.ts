@@ -159,6 +159,51 @@ export type Database = {
           },
         ]
       }
+      consumer_directory: {
+        Row: {
+          consumer_name: string
+          consumer_number: string
+          created_at: string
+          due_date: string
+          email: string
+          id: string
+          last_bill_amount: number
+          mobile: string
+          payment_status: string
+          registered: boolean
+          sanction_load: string
+          service_connection_date: string
+        }
+        Insert: {
+          consumer_name: string
+          consumer_number: string
+          created_at?: string
+          due_date?: string
+          email: string
+          id?: string
+          last_bill_amount?: number
+          mobile: string
+          payment_status?: string
+          registered?: boolean
+          sanction_load?: string
+          service_connection_date?: string
+        }
+        Update: {
+          consumer_name?: string
+          consumer_number?: string
+          created_at?: string
+          due_date?: string
+          email?: string
+          id?: string
+          last_bill_amount?: number
+          mobile?: string
+          payment_status?: string
+          registered?: boolean
+          sanction_load?: string
+          service_connection_date?: string
+        }
+        Relationships: []
+      }
       consumer_payment_detail: {
         Row: {
           amount_paid: number
@@ -257,6 +302,36 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      otp_verifications: {
+        Row: {
+          consumer_number: string
+          created_at: string
+          expiry_time: string
+          id: string
+          otp: string
+          purpose: string
+          verified: boolean
+        }
+        Insert: {
+          consumer_number: string
+          created_at?: string
+          expiry_time: string
+          id?: string
+          otp: string
+          purpose?: string
+          verified?: boolean
+        }
+        Update: {
+          consumer_number?: string
+          created_at?: string
+          expiry_time?: string
+          id?: string
+          otp?: string
+          purpose?: string
+          verified?: boolean
         }
         Relationships: []
       }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { 
   Zap, DollarSign, FileText, AlertCircle,
-  Activity, Loader2
+  Activity, Loader2, User, Calendar, Gauge, CreditCard
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [bills, setBills] = useState<any[]>([]);
   const [usageData, setUsageData] = useState<any[]>([]);
+  const [consumerDetails, setConsumerDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +39,22 @@ const Dashboard = () => {
     setProfile(profileRes.data);
     setBills(billsRes.data || []);
     setUsageData(usageRes.data || []);
+
+    // Fetch consumer directory details using consumer_no from metadata
+    const consumerNo = user!.user_metadata?.consumer_no;
+    if (consumerNo) {
+      try {
+        const { data } = await supabase.functions.invoke("consumer-auth", {
+          body: { action: "get-consumer-details", consumer_number: consumerNo },
+        });
+        if (data?.consumer) {
+          setConsumerDetails(data.consumer);
+        }
+      } catch (err) {
+        console.error("Failed to fetch consumer details:", err);
+      }
+    }
+
     setLoading(false);
   };
 
@@ -70,6 +87,17 @@ const Dashboard = () => {
     { title: "Unpaid Bills", value: `${unpaidBills.length}`, sub: unpaidBills.length > 0 && unpaidBills[0]?.due_date ? `Due: ${new Date(unpaidBills[0].due_date).toLocaleDateString()}` : "None", icon: Activity, color: "text-destructive", bgColor: "bg-destructive/10", borderColor: "border-l-destructive" },
   ];
 
+  // Consumer details card items from consumer_directory
+  const consumerInfo = consumerDetails ? [
+    { label: "Consumer Name", value: consumerDetails.consumer_name, icon: User },
+    { label: "Consumer Number", value: consumerDetails.consumer_number, icon: FileText },
+    { label: "Sanction Load", value: consumerDetails.sanction_load, icon: Gauge },
+    { label: "Service Connection Date", value: new Date(consumerDetails.service_connection_date).toLocaleDateString("en-IN"), icon: Calendar },
+    { label: "Last Bill Amount", value: `₹${Number(consumerDetails.last_bill_amount).toFixed(2)}`, icon: CreditCard },
+    { label: "Due Date", value: new Date(consumerDetails.due_date).toLocaleDateString("en-IN"), icon: Calendar },
+    { label: "Payment Status", value: consumerDetails.payment_status, icon: DollarSign },
+  ] : [];
+
   if (authLoading || loading) {
     return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></DashboardLayout>;
   }
@@ -78,9 +106,47 @@ const Dashboard = () => {
     <DashboardLayout>
       <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.08 } } }}>
         <motion.div variants={fadeUp} className="mb-8">
-          <h1 className="text-3xl font-bold mb-1">Welcome back, {profile?.full_name || "User"} 👋</h1>
+          <h1 className="text-3xl font-bold mb-1">Welcome back, {consumerDetails?.consumer_name || profile?.full_name || "User"} 👋</h1>
           <p className="text-muted-foreground">Here's your energy overview for today</p>
         </motion.div>
+
+        {/* Consumer Details Card */}
+        {consumerDetails && (
+          <motion.div variants={fadeUp} className="mb-8">
+            <Card className="border-border/50 border-l-4 border-l-primary">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  Consumer Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {consumerInfo.map((item, i) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                          <p className={`font-semibold text-sm truncate ${
+                            item.label === "Payment Status"
+                              ? item.value === "Paid" ? "text-success" : "text-destructive"
+                              : ""
+                          }`}>
+                            {item.value}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, index) => {
